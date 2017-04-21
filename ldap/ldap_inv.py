@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 ## ansible ldap inventory script Copyright (c) 2013 by Vincent Van der
 ## Kussen
 ##
@@ -22,29 +22,37 @@ import operator
 import os
 import shlex
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
+def main():
+    global json
+    try:
+        import simplejson as json
+    except ImportError:
+        import json
 
-# establish connection with LDAP server
-try:
-    l = ldap.initialize(os.getenv("LDAPHOST", ""))
-    username = os.getenv("LDAPBINDDN", "")
-    password = os.getenv("LDAPBINDPW", "")
-    l.set_option(ldap.OPT_PROTOCOL_VERSION,ldap.VERSION3)
-    l.bind_s(username, password, ldap.AUTH_SIMPLE)
+    # establish connection with LDAP server
+    try:
+        global l
+        l = ldap.initialize(os.getenv("LDAPHOST", ""))
+        username = os.getenv("LDAPBINDDN", "")
+        password = os.getenv("LDAPBINDPW", "")
+        l.set_option(ldap.OPT_PROTOCOL_VERSION,ldap.VERSION3)
+        l.bind_s(username, password, ldap.AUTH_SIMPLE)
 
-except ldap.LDAPError, e:
-    print e
+    except ldap.LDAPError as e:
+        print (e)
 
-# LDAP variables
-baseDN = os.getenv("LDAPBASEDN", 'ou=ansible, dc=ansible, dc=local')
-searchScope = ldap.SCOPE_SUBTREE
-attrs = None
+    # LDAP variables
+    global baseDN
+    baseDN = os.getenv("LDAPBASEDN", 'ou=ansible, dc=ansible, dc=local')
+    global searchScope
+    searchScope = os.getenv("LDAPSCOPE", ldap.SCOPE_SUBTREE)
+    global attrs
+    attrs = None
 
-# We only want the groups and not groups + computer CNs
-groupsearchFilter = '(&(objectClass=groupOfNames)(cn=*))'
+    # We only want the groups and not groups + computer CNs
+    global groupsearchFilter
+    groupsearchFilter = os.getenv("LDAPFILTER",
+            '(&(objectClass=groupOfNames)(cn=*))')
 
 # ------------------------------------------------------------------
 # function to split the ansibleVar (key=value) in a hashed key value.
@@ -112,10 +120,10 @@ def getlist():
             inv[group] = {"hosts": hostgroup}
             inv[group]['vars'] = dict(varlist)
             inv[group]["children"]= children
-        print json.dumps(inv, sort_keys=True, indent=2)
+        print (json.dumps(inv, sort_keys=True, indent=2))
 
-    except ldap.LDAPError, e:
-        print e
+    except ldap.LDAPError as e:
+        print (e)
 
     l.unbind_s()
 
@@ -146,10 +154,16 @@ def getdetails(host):
                             varlist.append((k, valuelist))
         details = dict(varlist)
 
-    print json.dumps(details, sort_keys=True, indent=2)
+    print (json.dumps(details, sort_keys=True, indent=2))
     l.unbind_s()
 
 # ----------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()
+else:
+    print ("failed to run main()")
+
 # get list of machines from RHN
 if len(sys.argv) == 2 and (sys.argv[1] == '--list'):
     getlist()
@@ -160,5 +174,5 @@ elif len(sys.argv) == 3 and (sys.argv[1] == '--host'):
     getdetails(host)
 
 else:
-    print "usage --list or --host <hostname>"
+    print ("usage --list or --host <hostname>")
     sys.exit(1)
